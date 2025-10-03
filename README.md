@@ -1,175 +1,59 @@
-# Salary & Payment Microservice (Node.js + TypeScript)
+# Salary & Payment Microservice
 
-A simple, clean, and test-driven Salary & Payment microservice that integrates with Paystack and uses Supabase (Postgres) as the database layer. Built with Node.js, TypeScript, Express and tested with Jest. The project is intentionally simple and readable — suitable as a junior-friendly assignment or a baseline microservice.
+A simple Node.js + TypeScript microservice that:
+- Stores employee details (salary & bank info)
+- Accepts customer payments via Paystack Transactions
+- Disburses salaries via Paystack Transfers
+- Publishes events (simulated logs) for integration with other services
 
-Repository files to inspect:
-- Source entry: [`src/index.ts`](src/index.ts:1)
-- Employee repository: [`src/models/employee.ts`](src/models/employee.ts:1)
-- Auth middleware: [`src/middleware/auth.ts`](src/middleware/auth.ts:1)
-- Paystack utils: [`src/utils/paystack.ts`](src/utils/paystack.ts:1)
-- Paystack payments service: [`src/services/payments.ts`](src/services/payments.ts:1)
-- Tests: [`tests/employee.test.ts`](tests/employee.test.ts:1), [`tests/auth.test.ts`](tests/auth.test.ts:1), [`tests/payments.test.ts`](tests/payments.test.ts:1)
-- Supabase migration: [`sql/migrations/create_employees.sql`](sql/migrations/create_employees.sql:1)
-- Example env: [`.env.example`](.env.example:1)
-- Jest config: [`jest.config.js`](jest.config.js:1)
+Tech
+- Node.js, TypeScript, Express
+- Supabase (optional) as DB
+- Paystack integration via Axios
+- JWT for auth
+- Jest for tests
 
-Quick status
-- Implemented: Employee repository + tests (in-memory fallback and Supabase client support), basic Express app with employee endpoints, JWT auth middleware, Payment service (initialize & verify) with tests, Paystack signature util, and TDD test-suite passing.
-- Remaining (planned): Full salary transfer/transfer-recipient integration, webhook route & verification, Swagger docs, Postman collection, more unit/integration tests for salaries, and README examples (this file contains usage and curl examples).
-
-Getting started (local)
-
-1. Prerequisites
-   - Node.js (v18+ recommended)
-   - npm
-   - Optional: Supabase project (if you want persistence)
-
-2. Clone & install
-   git clone <your-repo>
-   cd Salary\ &\ Payment\ Microservice
+Quickstart (local)
+1. Install
    npm install
+2. Configure
+   - Copy or edit `.env` at repository root and set:
+     - SUPABASE_URL, SUPABASE_KEY (optional)
+     - PAYSTACK_SECRET_KEY, PAYSTACK_PUBLIC_KEY
+     - PAYSTACK_WEBHOOK_SECRET
+     - JWT_SECRET
+     - USE_SUPABASE=false (for in-memory mode)
+3. Run migrations (if using Supabase)
+   psql "<your-connection-string>" -f sql/migrations/create_employees.sql
+   psql "<your-connection-string>" -f sql/migrations/create_salary_payments.sql
+4. Start
+   npm run dev
+5. Run tests
+   npm test
 
-3. Environment
-   - Copy the example env:
-     cp .env.example .env
-   - Edit `.env` and set:
-     - `SUPABASE_URL` and `SUPABASE_KEY` (if using Supabase)
-     - `PAYSTACK_SECRET_KEY` and `PAYSTACK_WEBHOOK_SECRET` (for production/testing)
-     - `JWT_SECRET`
+Important env variables
+- PORT (default 3000)
+- SUPABASE_URL, SUPABASE_KEY
+- PAYSTACK_SECRET_KEY, PAYSTACK_PUBLIC_KEY, PAYSTACK_WEBHOOK_SECRET
+- JWT_SECRET, JWT_EXPIRY
+- USE_SUPABASE (true/false)
 
-4. Database migration (Supabase)
-   - If you use Supabase, run the SQL in [`sql/migrations/create_employees.sql`](sql/migrations/create_employees.sql:1) in the Supabase SQL editor or via psql:
-     psql "<your-connection-string>" -f sql/migrations/create_employees.sql
-
-Project scripts
-- Start development (auto-reload):
-  npm run dev
-- Build:
-  npm run build
-- Run compiled:
-  npm start
-- Run tests:
-  npm test
-- Run tests in watch mode:
-  npm run test:watch
-
-API Endpoints (implemented)
+Main endpoints (core)
 - Health
   - GET /health
-    - Response: { status: 'ok', timestamp: '...' }
-
-- Employees (persisted to Supabase when configured; otherwise in-memory)
+- Employees
   - POST /employees
-    - Body:
-      {
-        "name":"John Doe",
-        "email":"john@example.com",
-        "phone":"08012345678",
-        "account_number":"0123456789",
-        "bank_code":"057",
-        "salary_amount":500000
-      }
-    - Success (201):
-      Returns the created Employee object with id and created_at.
-    - Validation errors: 400 with message.
-
   - GET /employees
-    - Lists employees (200): array of employee objects.
-
   - GET /employees/:id
-    - Fetch single employee (200) or 404 if not found.
+- Payments
+  - POST /payments/initialize
+  - GET /payments/verify/:reference
+  - POST /payments/webhook
+- Salary
+  - POST /salary/pay/:employeeId (Admin/HR)
+  - POST /salary/pay-all (Admin/HR)
+  - GET /salary/status/:transferCode (Admin/HR)
 
-Payments (Paystack integration — implemented: initialize & verify)
-- POST /payments/initialize
-  - Body: { email: string, amount: number }
-  - Calls Paystack `/transaction/initialize` via [`src/services/payments.ts`](src/services/payments.ts:1)
-  - Example (curl):
-    curl -X POST http://localhost:3000/payments/initialize -H 'Content-Type: application/json' -d '{"email":"buyer@example.com","amount":5000}'
-
-- GET /payments/verify/:reference
-  - Calls Paystack `/transaction/verify/:reference`
-  - Example:
-    curl http://localhost:3000/payments/verify/ref_123
-
-- POST /payments/webhook
-  - Verifies signature with [`src/utils/paystack.ts`](src/utils/paystack.ts:1) using `PAYSTACK_WEBHOOK_SECRET`.
-  - The route will be implemented to accept Paystack event types (e.g., charge.success) and log/publish events.
-
-Salary disbursement (planned)
-- POST /salary/pay/:employeeId — pay salary to single employee (register transfer recipient & initiate transfer)
-- POST /salary/pay-all — bulk salary run (with monthly-once rule)
-- GET /salary/status/:transferCode — check transfer status
-
-Security
-- JWT-based role checks implemented in [`src/middleware/auth.ts`](src/middleware/auth.ts:1)
-  - Use tokens with payload containing `role` (e.g., "Admin", "HR") and `sub` user id.
-  - Example for tests: tokens are generated using the `JWT_SECRET` from the environment.
-
-Testing
-- Unit tests are in the `tests` folder and run via `npm test`.
-  - Employee repository tests use an in-memory store when Supabase is not configured so tests run offline.
-  - Payments tests mock `axios` to isolate external HTTP calls.
-  - Auth tests validate role-based restrictions.
-
-Examples
-
-1) Create an employee (curl)
-curl -X POST http://localhost:3000/employees \
-  -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","email":"john@example.com","phone":"08012345678","account_number":"0123456789","bank_code":"057","salary_amount":500000}'
-
-Success (201)
-{
-  "id": "uuid-v4",
-  "name": "John Doe",
-  "email": "john@example.com",
-  "phone": "08012345678",
-  "account_number": "0123456789",
-  "bank_code": "057",
-  "salary_amount": 500000,
-  "created_at": "2025-10-03T..."
-}
-
-2) Initialize payment (curl)
-curl -X POST http://localhost:3000/payments/initialize \
-  -H "Content-Type: application/json" \
-  -d '{"email":"buyer@example.com","amount":5000}'
-
-Example success response (Paystack data returned):
-{
-  "authorization_url": "https://paystack/authorize",
-  "reference": "ref_123",
-  ...
-}
-
-Developer notes & architecture
-- This project follows separation of concerns:
-  - routes/controllers (not yet split into separate files) will contain request parsing & response formatting
-  - services encapsulate external integrations like Paystack (`src/services/payments.ts`).
-  - models contain data access logic and can either use Supabase client or in-memory fallback (`src/models/employee.ts`).
-  - middleware contains auth and other request middlewares (`src/middleware/auth.ts`).
-  - utils contains helper functions (Paystack signature verify, headers) (`src/utils/paystack.ts`).
-- Tests use Jest + ts-jest; axios is mocked in Paystack tests. Tests aim to be fast and deterministic.
-
-Next steps (what remains to fully satisfy original requirements)
-- Implement salary transfer service (using Paystack Transfers API) with recipient creation and transfer initiation.
-- Implement webhook endpoint for payments and transfers with signature verification and event publication (simulated logs).
-- Add Swagger/OpenAPI documentation (e.g., with `swagger-jsdoc` or `openapi` json).
-- Export a Postman collection at `postman/SalaryPayment.postman_collection.json`.
-- Add integration tests with mocked Paystack endpoints (nock or jest mocks).
-- Add seed scripts for test users (Admin, HR) and examples for token generation.
-
-Where to look for code
-- App entry: [`src/index.ts`](src/index.ts:1)
-- Employee repository & model: [`src/models/employee.ts`](src/models/employee.ts:1)
-- Paystack utilities: [`src/utils/paystack.ts`](src/utils/paystack.ts:1)
-- Payments service: [`src/services/payments.ts`](src/services/payments.ts:1)
-- Auth middleware: [`src/middleware/auth.ts`](src/middleware/auth.ts:1)
-- Tests: [`tests`](tests:1)
-
-If you want, I can:
-- Continue and implement the Salary Transfers endpoints and tests (TDD-first).
-- Add the webhook route implementation and webhook signature verification handler.
-- Add Swagger docs and the Postman collection.
-
-This README is a starting point — the project is intentionally modular so the next features can be added with the same TDD-first flow.# Salary-and-payment-microservices
+Notes
+- The project is intentionally simple and test-first. Unit and integration tests mock external Paystack calls so the suite runs offline.
+- For production: enable Supabase persistence, secure env secrets, and set up a real event publisher and monitoring.
