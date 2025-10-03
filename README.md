@@ -54,6 +54,6 @@ Main endpoints (core)
   - POST /salary/pay-all (Admin/HR)
   - GET /salary/status/:transferCode (Admin/HR)
 
-Notes
-- The project is intentionally simple and test-first. Unit and integration tests mock external Paystack calls so the suite runs offline.
-- For production: enable Supabase persistence, secure env secrets, and set up a real event publisher and monitoring.
+
+
+
